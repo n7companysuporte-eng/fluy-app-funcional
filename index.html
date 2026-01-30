@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Fluy • Controle Financeiro</title>
+
+<link rel="manifest" href="#">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+:root{
+  --green:#1db954;
+  --yellow:#f5c518;
+  --dark:#0f172a;
+  --light:#ffffff;
+  --bg:#f1f5f9;
+}
+
+body{
+  margin:0;
+  font-family: 'Inter', sans-serif;
+  background:var(--bg);
+  color:#111;
+}
+
+.dark{
+  background:#020617;
+  color:#fff;
+}
+
+.app{
+  max-width:420px;
+  margin:auto;
+  min-height:100vh;
+}
+
+/* Splash */
+#splash{
+  position:fixed;
+  inset:0;
+  background:linear-gradient(135deg,var(--green),var(--yellow));
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  z-index:999;
+  animation:fadeOut 1s ease 2.5s forwards;
+}
+
+#splash h1{
+  color:#fff;
+  font-size:42px;
+  animation:pulse 1.5s infinite;
+}
+
+@keyframes pulse{
+  0%{transform:scale(1)}
+  50%{transform:scale(1.1)}
+  100%{transform:scale(1)}
+}
+
+@keyframes fadeOut{
+  to{opacity:0; visibility:hidden}
+}
+
+/* Header */
+header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:16px;
+  background:linear-gradient(135deg,var(--green),var(--yellow));
+  color:#fff;
+}
+
+header h2{
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+
+header button{
+  background:none;
+  border:none;
+  font-size:18px;
+  color:#fff;
+}
+
+/* Cards */
+.card{
+  background:#fff;
+  border-radius:18px;
+  padding:16px;
+  margin:16px;
+  box-shadow:0 10px 30px rgba(0,0,0,.1);
+}
+
+.dark .card{
+  background:#020617;
+}
+
+.saldo{
+  font-size:32px;
+  font-weight:700;
+}
+
+/* Botões */
+.actions{
+  display:flex;
+  gap:12px;
+  margin-top:12px;
+}
+
+.btn{
+  flex:1;
+  padding:14px;
+  border-radius:14px;
+  border:none;
+  font-weight:700;
+  cursor:pointer;
+  transition:.2s;
+}
+
+.btn:active{transform:scale(.95)}
+
+.receita{background:var(--green);color:#fff}
+.despesa{background:#ef4444;color:#fff}
+
+/* Tabs */
+.tabs{
+  display:flex;
+  gap:8px;
+  padding:0 16px;
+}
+
+.tab{
+  flex:1;
+  padding:10px;
+  border-radius:12px;
+  text-align:center;
+  background:#e5e7eb;
+  cursor:pointer;
+}
+
+.tab.active{
+  background:var(--green);
+  color:#fff;
+}
+
+/* Lista */
+.list{
+  margin-top:10px;
+}
+
+.item{
+  display:flex;
+  justify-content:space-between;
+  padding:10px;
+  border-bottom:1px solid #e5e7eb;
+}
+
+/* Limite */
+.progress{
+  height:12px;
+  background:#e5e7eb;
+  border-radius:10px;
+  overflow:hidden;
+}
+
+.bar{
+  height:100%;
+  background:var(--green);
+  width:0%;
+  transition:.4s;
+}
+
+/* Animações */
+.msg{
+  text-align:center;
+  margin-top:10px;
+  font-weight:600;
+  animation:slide .5s;
+}
+
+@keyframes slide{
+  from{opacity:0; transform:translateY(10px)}
+  to{opacity:1}
+}
+</style>
+</head>
+
+<body>
+
+<div id="splash">
+  <h1>Fluy</h1>
+  <p style="color:#fff">Seu dinheiro, no controle</p>
+</div>
+
+<div class="app">
+
+<header>
+  <h2>💸 Fluy</h2>
+  <button onclick="toggleDark()">🌙</button>
+</header>
+
+<div class="card">
+  <div>Saldo disponível</div>
+  <div class="saldo" id="saldo">R$ 0,00</div>
+
+  <div class="actions">
+    <button class="btn receita" onclick="addReceita()">+ Receita</button>
+    <button class="btn despesa" onclick="addDespesa()">- Despesa</button>
+  </div>
+
+  <div class="msg" id="msg"></div>
+</div>
+
+<div class="card">
+  <h3>Limite de gastos mensais</h3>
+  <input type="number" id="limiteInput" placeholder="Definir limite" style="width:100%;padding:10px;border-radius:10px">
+  <div class="progress" style="margin-top:10px">
+    <div class="bar" id="bar"></div>
+  </div>
+  <small id="percentual">0%</small>
+</div>
+
+<div class="card">
+  <h3>Gráfico geral</h3>
+  <canvas id="chart"></canvas>
+</div>
+
+<div class="card">
+  <h3>Lançamentos</h3>
+  <div class="list" id="lista"></div>
+</div>
+
+</div>
+
+<script>
+let receitas = JSON.parse(localStorage.getItem("receitas"))||[];
+let despesas = JSON.parse(localStorage.getItem("despesas"))||[];
+let limite = localStorage.getItem("limite")||0;
+
+const msgsReceita=[
+"Dinheiro entrando 😎","Boa! Caixa positivo 💰","Renda nova desbloqueada 🚀"
+];
+const msgsDespesa=[
+"Ixi… gastou 😅","Foi necessário… né? 🤡","O bolso sentiu 💸"
+];
+
+function salvar(){
+  localStorage.setItem("receitas",JSON.stringify(receitas));
+  localStorage.setItem("despesas",JSON.stringify(despesas));
+  localStorage.setItem("limite",limite);
+}
+
+function atualizar(){
+  let totalR = receitas.reduce((a,b)=>a+b.valor,0);
+  let totalD = despesas.reduce((a,b)=>a+b.valor,0);
+  let saldo = totalR - totalD;
+  document.getElementById("saldo").innerText =
+    saldo.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+
+  let pct = limite>0 ? (totalD/limite)*100 : 0;
+  document.getElementById("bar").style.width = Math.min(pct,100)+"%";
+  document.getElementById("percentual").innerText = Math.floor(pct)+"%";
+
+  renderLista();
+  renderChart(totalR,totalD);
+  salvar();
+}
+
+function addReceita(){
+  let v = prompt("Valor da receita");
+  if(!v) return;
+  receitas.push({valor:Number(v),data:new Date()});
+  document.getElementById("msg").innerText = msgsReceita[Math.floor(Math.random()*msgsReceita.length)];
+  atualizar();
+}
+
+function addDespesa(){
+  let v = prompt("Valor da despesa");
+  if(!v) return;
+  despesas.push({valor:Number(v),data:new Date()});
+  document.getElementById("msg").innerText = msgsDespesa[Math.floor(Math.random()*msgsDespesa.length)];
+  atualizar();
+}
+
+function renderLista(){
+  let el = document.getElementById("lista");
+  el.innerHTML="";
+  despesas.forEach((d,i)=>{
+    el.innerHTML+=`<div class="item">- R$ ${d.valor} <button onclick="del(${i})">❌</button></div>`;
+  });
+}
+
+function del(i){
+  despesas.splice(i,1);
+  atualizar();
+}
+
+function renderChart(r,d){
+  if(window.grafico) window.grafico.destroy();
+  window.grafico = new Chart(document.getElementById("chart"),{
+    type:'doughnut',
+    data:{
+      labels:["Receita","Despesa"],
+      datasets:[{
+        data:[r,d],
+        backgroundColor:["#1db954","#ef4444"]
+      }]
+    }
+  });
+}
+
+document.getElementById("limiteInput").onchange=e=>{
+  limite = Number(e.target.value);
+  atualizar();
+};
+
+function toggleDark(){
+  document.body.classList.toggle("dark");
+}
+
+atualizar();
+</script>
+
+</body>
+</html>
